@@ -9,9 +9,8 @@ const fs = require('fs');
 const app = express();
 app.use(cors());
 
-// AJUSTE 1: Puerto dinámico para la nube (Render)
+// AJUSTE 1: Puerto dinámico para Render y límites de tamaño
 const PORT = process.env.PORT || 3001;
-
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -75,7 +74,7 @@ async function conectarDB() {
         );
     `);
 
-    // AJUSTE 2: Usuario Admin (Sigue siendo el mismo que tenías)
+    // AJUSTE 2: Crear el usuario Admin con datos compatibles
     const adminExists = await db.get('SELECT * FROM usuarios WHERE email = ?', ['admin@titantech.com']);
     if (!adminExists) {
         await db.run('INSERT INTO usuarios (email, password, nombre) VALUES (?, ?, ?)', 
@@ -90,7 +89,6 @@ async function conectarDB() {
             ('GPU Neón RTX', 890, 'https://images.unsplash.com/photo-1591488320449-011701bb6704?w=400', 'Gráficos ultra realistas con trazado de rayos.'),
             ('Módulo RAM RGB', 120, 'https://images.unsplash.com/photo-1541029071515-84cc54f84dc5?w=400', 'Velocidad de 3600MHz con iluminación dinámica.')`);
     }
-
     console.log("🚀 Sistema TITÁNTECH listo.");
 }
 
@@ -103,7 +101,7 @@ app.post('/api/admin/productos', upload.single('imagen'), async (req, res) => {
         const { nombre, precio, descripcion } = req.body;
         if (!req.file) return res.status(400).json({ success: false, message: 'Falta la imagen' });
 
-        // AJUSTE 3: Ruta de imagen relativa para que funcione en cualquier URL
+        // AJUSTE 3: URL relativa para que funcione en la nube
         const imagenUrl = `/uploads/${req.file.filename}`;
         await db.run(
             'INSERT INTO productos (nombre, precio, imagen, descripcion) VALUES (?, ?, ?, ?)',
@@ -127,22 +125,32 @@ app.post('/api/login', async (req, res) => {
     try {
         const usuario = await db.get('SELECT * FROM usuarios WHERE email = ? AND password = ?', [email, password]);
         if (usuario) {
-            res.json({ success: true, user: { email: usuario.email, nombre: usuario.nombre } });
+            // AJUSTE 4: Enviamos el rol 'admin' manualmente si el correo coincide
+            const rol = usuario.email === 'admin@titantech.com' ? 'admin' : 'user';
+            res.json({ 
+                success: true, 
+                user: { email: usuario.email, nombre: usuario.nombre, rol: rol } 
+            });
         } else {
             res.status(401).json({ success: false, message: 'Credenciales incorrectas' });
         }
-    } catch (error) { res.status(500).json({ success: false }); }
+    } catch (error) { 
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Error interno' }); 
+    }
 });
 
 app.post('/api/register', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, nombre } = req.body;
     try {
         const existe = await db.get('SELECT * FROM usuarios WHERE email = ?', [email]);
         if (existe) return res.status(400).json({ success: false, message: 'Ya registrado' });
-        await db.run('INSERT INTO usuarios (email, password) VALUES (?, ?)', [email, password]);
+        await db.run('INSERT INTO usuarios (email, password, nombre) VALUES (?, ?, ?)', [email, password, nombre || 'Nuevo Usuario']);
         res.json({ success: true });
     } catch (error) { res.status(500).json({ success: false }); }
 });
+
+// --- RUTAS DE TIENDA Y PEDIDOS ---
 
 app.get('/api/productos', async (req, res) => {
     try {
@@ -161,10 +169,7 @@ app.post('/api/finalizar-compra', async (req, res) => {
             );
         }
         res.json({ success: true });
-    } catch (error) { 
-        console.error(error);
-        res.status(500).json({ success: false }); 
-    }
+    } catch (error) { res.status(500).json({ success: false }); }
 });
 
 app.get('/api/historial/:email', async (req, res) => {
@@ -174,10 +179,10 @@ app.get('/api/historial/:email', async (req, res) => {
             [req.params.email]
         );
         res.json(pedidos);
-    } catch (e) { 
-        res.status(500).json([]); 
-    }
+    } catch (e) { res.status(500).json([]); }
 });
+
+// --- RUTAS DE TICKETS ---
 
 app.post('/api/tickets', async (req, res) => {
     const { email, titulo, prioridad } = req.body;
@@ -198,7 +203,7 @@ app.get('/api/mis-tickets/:email', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false }); }
 });
 
-// AJUSTE FINAL: Escuchar en el puerto que Render asigne
+// AJUSTE FINAL: Escuchar en 0.0.0.0 para Render
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`📡 Servidor TITÁNTECH activo en puerto ${PORT}`);
 });
