@@ -9,7 +9,9 @@ const fs = require('fs');
 const app = express();
 app.use(cors());
 
-// AJUSTE 1: Límites de tamaño para fotos de alta resolución
+// AJUSTE 1: Puerto dinámico para la nube (Render)
+const PORT = process.env.PORT || 3001;
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -28,7 +30,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // Límite de 10MB por foto
+    limits: { fileSize: 10 * 1024 * 1024 } 
 });
 
 app.use('/uploads', express.static(uploadDir));
@@ -73,7 +75,7 @@ async function conectarDB() {
         );
     `);
 
-    // AJUSTE 2: Crear el usuario Admin por defecto si no existe
+    // AJUSTE 2: Usuario Admin (Sigue siendo el mismo que tenías)
     const adminExists = await db.get('SELECT * FROM usuarios WHERE email = ?', ['admin@titantech.com']);
     if (!adminExists) {
         await db.run('INSERT INTO usuarios (email, password, nombre) VALUES (?, ?, ?)', 
@@ -101,7 +103,8 @@ app.post('/api/admin/productos', upload.single('imagen'), async (req, res) => {
         const { nombre, precio, descripcion } = req.body;
         if (!req.file) return res.status(400).json({ success: false, message: 'Falta la imagen' });
 
-        const imagenUrl = `http://localhost:3001/uploads/${req.file.filename}`;
+        // AJUSTE 3: Ruta de imagen relativa para que funcione en cualquier URL
+        const imagenUrl = `/uploads/${req.file.filename}`;
         await db.run(
             'INSERT INTO productos (nombre, precio, imagen, descripcion) VALUES (?, ?, ?, ?)',
             [nombre, parseFloat(precio), imagenUrl, descripcion]
@@ -141,8 +144,6 @@ app.post('/api/register', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false }); }
 });
 
-// --- RUTAS DE TIENDA Y PEDIDOS (HISTORIAL) ---
-
 app.get('/api/productos', async (req, res) => {
     try {
         const productos = await db.all('SELECT * FROM productos');
@@ -150,7 +151,6 @@ app.get('/api/productos', async (req, res) => {
     } catch (e) { res.status(500).json([]); }
 });
 
-// FINALIZAR COMPRA: Registra cada producto en la tabla pedidos
 app.post('/api/finalizar-compra', async (req, res) => {
     const { email, productos } = req.body;
     try {
@@ -167,7 +167,6 @@ app.post('/api/finalizar-compra', async (req, res) => {
     }
 });
 
-// OBTENER HISTORIAL: Trae todos los pedidos de un correo específico
 app.get('/api/historial/:email', async (req, res) => {
     try {
         const pedidos = await db.all(
@@ -179,8 +178,6 @@ app.get('/api/historial/:email', async (req, res) => {
         res.status(500).json([]); 
     }
 });
-
-// --- RUTAS DE TICKETS ---
 
 app.post('/api/tickets', async (req, res) => {
     const { email, titulo, prioridad } = req.body;
@@ -201,7 +198,7 @@ app.get('/api/mis-tickets/:email', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false }); }
 });
 
-const PORT = process.env.PORT || 3001;
+// AJUSTE FINAL: Escuchar en el puerto que Render asigne
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor TITÁNTECH activo en puerto ${PORT}`);
+    console.log(`📡 Servidor TITÁNTECH activo en puerto ${PORT}`);
 });
