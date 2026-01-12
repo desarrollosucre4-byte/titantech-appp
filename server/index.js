@@ -201,6 +201,7 @@ app.get('/api/mis-tickets/:email', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false }); }
 });
 
-app.listen(3001, () => {
-    console.log("📡 Servidor TITÁNTECH en puerto 3001");
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor TITÁNTECH activo en puerto ${PORT}`);
 });
